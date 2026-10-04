@@ -1,0 +1,15 @@
+[build-system]
+requires=["setuptools>=61"]
+build-backend="setuptools.build_meta"
+[project]
+name="logscope"
+version="1.0.0"
+description="Offline ISO text log parser and analyzer"
+readme="README.md"
+requires-python=">=3.10"
+license={file="LICENSE"}
+dependencies=[]
+[project.scripts]
+logscope="logscope.app:main"
+[tool.setuptools.packages.find]
+where=["src"]

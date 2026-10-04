@@ -1,0 +1,5 @@
+2024-01-02T03:04:05Z ERROR source=api failed login
+2024-01-02T03:05:00Z WARN source=worker queue is slow
+2024-01-02T03:06:00Z INFO source=api request completed
+2024-01-02T03:07:00Z DEBUG source=worker poll
+this line is intentionally malformed
