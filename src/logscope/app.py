@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import collections
 import datetime as dt
+import json
 import os
 import re
 import sys
@@ -115,13 +116,21 @@ def bound(value: str, label: str) -> dt.datetime:
         raise ValueError(f"{label} 必须是 ISO 时间戳: {exc}") from exc
 
 
-def summary(records: list[Record], bad: list[Malformed]) -> None:
+def summary(records: list[Record], bad: list[Malformed], as_json: bool = False) -> None:
     levels = collections.Counter(record.level for record in records)
     hours = collections.Counter(
         record.timestamp.strftime("%Y-%m-%d %H:00 ")
         + (record.timestamp.strftime("%z") if _aware(record.timestamp) else "(无时区)")
         for record in records
     )
+    if as_json:
+        print(json.dumps({
+            "valid_count": len(records),
+            "levels": dict(sorted(levels.items())),
+            "hours": dict(sorted(hours.items())),
+            "malformed_count": len(bad),
+        }, ensure_ascii=False, sort_keys=True))
+        return
     print(f"有效日志: {len(records)} 条")
     print("级别统计: " + (", ".join(f"{key}={value}" for key, value in sorted(levels.items())) or "无"))
     print("时间段统计:")
@@ -133,6 +142,7 @@ def summary(records: list[Record], bad: list[Malformed]) -> None:
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="logscope", description="离线解析并统计文本日志")
     parser.add_argument("--data", default=os.environ.get("LOGSCOPE_DATA"), help="UTF-8 日志文件（或设置 LOGSCOPE_DATA）")
+    parser.add_argument("--json", action="store_true", help="以 JSON 输出结果，便于脚本处理")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("summary", help="统计级别、小时与格式错误")
     filter_parser = subparsers.add_parser("filter", help="按级别、关键字或时间范围筛选")
@@ -161,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
     if args.command == "summary":
-        summary(records, malformed)
+        summary(records, malformed, args.json)
     elif args.command == "filter":
         try:
             selected = filter_records(
@@ -173,18 +183,41 @@ def main(argv: list[str] | None = None) -> int:
             )
         except ValueError as exc:
             parser.error(str(exc))
-        for record in selected:
-            print(f"{record.line}: {record.timestamp.isoformat()} {record.level} {record.message}")
+        if args.json:
+            print(json.dumps({
+                "records": [{
+                    "line": record.line,
+                    "timestamp": record.timestamp.isoformat(),
+                    "level": record.level,
+                    "message": record.message,
+                    "source": record.source,
+                } for record in selected],
+                "matched_count": len(selected),
+                "malformed_count": len(malformed),
+            }, ensure_ascii=False, sort_keys=True))
+        else:
+            for record in selected:
+                print(f"{record.line}: {record.timestamp.isoformat()} {record.level} {record.message}")
         print(f"匹配: {len(selected)} 条；格式错误: {len(malformed)} 行", file=sys.stderr)
     elif args.command == "sources":
-        for source, count in collections.Counter(record.source for record in records).most_common(args.limit):
-            print(f"{source}: {count}")
+        sources = collections.Counter(record.source for record in records).most_common(args.limit)
+        if args.json:
+            print(json.dumps({"sources": [{"source": source, "count": count} for source, count in sources],
+                              "malformed_count": len(malformed)}, ensure_ascii=False, sort_keys=True))
+        else:
+            for source, count in sources:
+                print(f"{source}: {count}")
         if malformed:
             print(f"格式错误: {len(malformed)} 行", file=sys.stderr)
     else:
-        for item in malformed:
-            print(f"第 {item.line} 行: {item.reason} | {item.text}")
-        print(f"格式错误共 {len(malformed)} 行")
+        if args.json:
+            print(json.dumps({"errors": [{"line": item.line, "reason": item.reason, "text": item.text}
+                                         for item in malformed], "malformed_count": len(malformed)},
+                             ensure_ascii=False, sort_keys=True))
+        else:
+            for item in malformed:
+                print(f"第 {item.line} 行: {item.reason} | {item.text}")
+            print(f"格式错误共 {len(malformed)} 行")
     return 0
 
 

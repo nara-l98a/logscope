@@ -1,4 +1,4 @@
-import io,tempfile,unittest
+import io,json,tempfile,unittest
 import datetime as dt
 from contextlib import redirect_stdout,redirect_stderr
 from pathlib import Path
@@ -35,4 +35,16 @@ class Tests(unittest.TestCase):
   r,b=parse_lines(lines);o=io.StringIO()
   with redirect_stdout(o):summary(r,b)
   self.assertIn("+0200",o.getvalue());self.assertIn("+0000",o.getvalue())
+ def test_json_summary_and_filter(self):
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)/"x.log";p.write_text(SAMPLE,encoding="utf-8")
+   o=io.StringIO()
+   with redirect_stdout(o):main(["--data",str(p),"--json","summary"])
+   result=json.loads(o.getvalue())
+   self.assertEqual(result["valid_count"],2);self.assertEqual(result["levels"]["ERROR"],1)
+   o=io.StringIO()
+   with redirect_stdout(o),redirect_stderr(io.StringIO()):
+    main(["--data",str(p),"--json","filter","--level","ERROR"])
+   result=json.loads(o.getvalue())
+   self.assertEqual(result["matched_count"],1);self.assertEqual(result["records"][0]["source"],"api")
 if __name__=="__main__":unittest.main()

@@ -28,6 +28,9 @@ logscope --data examples/sample.log filter --level ERROR
 logscope --data examples/sample.log filter --keyword queue --start 2024-01-02T00:00:00Z --end 2024-01-02T23:59:59Z
 logscope --data examples/sample.log sources --limit 2
 logscope --data examples/sample.log errors
+# 面向脚本的 JSON 输出（所有子命令均支持）
+logscope --data examples/sample.log --json summary
+logscope --data examples/sample.log --json filter --level ERROR
 ```
 
 `summary` 示例输出：
@@ -46,6 +49,11 @@ logscope --data examples/sample.log errors
 - `filter`：`--level ERROR|WARN|INFO|DEBUG|TRACE`、`--keyword TEXT`、`--start ISO`、`--end ISO`；输出匹配行号。
 - `sources`：`--limit N`，默认 10，必须为正整数。
 - `errors`：错误行号、原因和原文。
+
+全局选项 `--json` 将结果输出为单行 UTF-8 JSON，便于 CI 或其他脚本消费：`summary` 返回
+`valid_count`、`levels`、`hours`、`malformed_count`；`filter` 返回记录数组及计数；
+`sources` 返回来源和计数数组；`errors` 返回包含 `line`、`reason`、`text` 的错误数组。
+筛选命令的诊断计数仍写入标准错误，不会污染 JSON 标准输出。
 
 数据路径也可写作 `LOGSCOPE_DATA=/path/app.log logscope summary`。不存在文件、目录、非 UTF-8、非法时间、倒置范围、时区标记不匹配或无效 limit 会明确报错并返回非零状态。
 
